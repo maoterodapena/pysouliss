@@ -57,15 +57,27 @@ typical = {
     0x68:"Pressure setpoint (0, 1500) hPa"
     }
 
+class Typical:
+    def __init__(self, type):
+        self.type = type
+        self.description = typical[type]
+        
 class Node:
-    def __init__(self):
+    def __init__(self, i):
+        self.index = i
+        self.typicals = []
         pass
+
+    def add_typical(self, typical):
+        self.typicals.append(typical)
 
 class Souliss:
 
 
     def __init__(self):
         self.available = False
+
+        self.nodes = []
 
     def set_parameters(self, ip, node_index, user_index, logging=True):
 
@@ -76,8 +88,6 @@ class Souliss:
         self.socket = socket(AF_INET, SOCK_DGRAM)
         self.socket.settimeout(1)
         self.logging = logging
-
-        self.num_nodos = 0
 
     def is_available(self):
         self.send(SOULISS_FC_PING)
@@ -131,29 +141,30 @@ class Souliss:
         self.log ('database_structure_request OK')
         self.send(SOULISS_FC_DATABASE_STRUCTURE_REQUEST)
         res = self.get_response(SOULISS_FC_DATABASE_STRUCTURE_REQUEST)
+        self.log(Macaco_frame.decode(res))
 
         if res:
-            self.num_nodos = ord(res[12])
-            self.log ("%d nodes found" % self.num_nodos)
+            num_nodes = ord(res[12])
+            self.log ("%d nodes found" % num_nodes)
 
-            for n in xrange(self.num_nodos):
-                self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, self.num_nodos)
+            for n in xrange(num_nodes):
+                new_node = Node(n)
+                self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, num_nodes)
                 res = self.get_response(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST)
                 if res:
-                    self.num_typicals = ord(res[11])
-                    self.typical = []
-                    for t in xrange(self.num_typicals):
+                    num_typicals = ord(res[11])
+                    for t in xrange(num_typicals):
                         tipo = ord(res[12+t])
                         if tipo>0:
-                            self.typical.append([tipo, typical[tipo]])
+                            new_node.add_typical(Typical(tipo))
+                self.nodes.append(new_node)
         self.log ('database_structure_request OK')
         
-
     def dump_structure(self):
-        for n in xrange(self.num_nodos):
-            print "Nodo %d de %d" % (n+1, self.num_nodos)
-            for t in self.typical:
-                print "   Tipo: %d - %s" % (t[0], t[1])
+        for n in self.nodes:
+            print "Nodo %d de %d" % (n.index+1, len(self.nodes))
+            for t in n.typicals:
+                print "   Tipo: %d - %s" % (t.type, t.description)
 
     def close(self):
         self.socket.close()
