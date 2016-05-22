@@ -178,7 +178,7 @@ class Souliss:
                     num_typicals = ord(res[11])
                     for t in xrange(num_typicals):
                         tipo = ord(res[12+t])
-                        if tipo>0:
+                        if tipo>0 and tipo<255:
                             new_node.add_typical(Typical(tipo))
                 self.nodes.append(new_node)
         self.log ('database_structure_request OK')
@@ -187,7 +187,7 @@ class Souliss:
         for n in self.nodes:
             print "Nodo %d de %d" % (n.index+1, len(self.nodes))
             for t in n.typicals:
-                print "   Tipo: %d - %s" % (t.type, t.description)
+                print "   Tipo: %d - %s" % (t.ttype, t.description)
         
     def dump_json_structure(self):
         res = {'id': []}
