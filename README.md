@@ -1,14 +1,23 @@
 # pysouliss
+Python API for talking to a Souliss gateway (http://souliss.net/). This is a very early stage of the project.
 
-This is a simple python wrapper to communicate with the home automation framework Souliss.
+# Demo
+After cloning the repository you can test it with your actual configuration with:
+```
+python main.py -v -g <ip-gateway>
+```
 
-Please, note this is in a very early stage of development. All kinds of suggestions are welcome. At this point, I am just trying to understand the underlaying communication system.
+# Usage
+```python
+import souliss.souliss as souliss
+SOULISS = souliss.Souliss('192.168.1.77')
+ok = SOULISS.database_structure_request()
 
-## Usage
+if ok:
+    SOULISS.subscribe_all_typicals(0) # subscribe to all typicals on node 0
+    while True:
+        SOULISS.get_response()
+```
 
-1. Create an object Souliss()
-2. Set the gateway IP and node index/user index with set_parameters(ip, node_index, user_index). You can obtain this data from the phone app.
+In the above example PySouliss will get the nodes and typicals on the gateway and start listening to events on node 0, keeping an internal state of each typical and showing a messagge if something changes.
 
-## Methods
-**database_structure_request()**: query the gateway and populate a list of nodes, with its slots, on the Souliss object.
-**dump_structure**: writes a textual description of the nodes found.
