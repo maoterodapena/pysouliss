@@ -15,7 +15,7 @@ class VNet_frame:
             self.destino_final = 17*256
 
             # Obtained from souliss app (why??? don't remember :(
-            self.destino_original = 22    # TODO: works with any number!
+            self.destino_original = 16    # TODO: works with any number!
             self.payload = payload
 
     def from_data(self, data):

@@ -1,4 +1,6 @@
-"""Example for using pysouliss."""
+"""
+Example for using pysouliss.
+"""
 import souliss as souliss
 from optparse import OptionParser
 import logging

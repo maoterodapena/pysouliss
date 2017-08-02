@@ -1,5 +1,6 @@
 from struct import pack
 
+# List of tested functional codes
 MACACO_DESC = {
     0x08: 'Ping',
     0x18: 'Ping answer',
@@ -9,7 +10,9 @@ MACACO_DESC = {
     0x22: 'Read typical logic request',
     0x32: 'Read typical logic answer',
     0x21: 'Read state request with subscription',
-    0x31: 'Read state answer with subscription'
+    0x31: 'Read state answer with subscription',
+    0x31: 'Read state request with subscription',
+    0x33: 'Force imput values'
     }
 
 
