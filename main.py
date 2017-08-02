@@ -1,4 +1,3 @@
-# TODO
 """Example for using pysouliss."""
 import souliss as souliss
 from optparse import OptionParser
@@ -22,7 +21,7 @@ def set_main_options():
     if options.verbose:
         logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
     else:
-        logging.basicConfig(format="%(levelname)s: %(message)s")
+        logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
 
     return options
 
