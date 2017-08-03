@@ -69,8 +69,7 @@ typical_types = {
         0x68: {"desc": "Typical 68 : Pressure measure (0, 1500) hPa", "size": 2}
         }
 
-
-class Typical:
+class Typical(object):
     def __init__(self, ttype):
         self.ttype = ttype
         self.description = typical_types[ttype]['desc']
@@ -79,10 +78,19 @@ class Typical:
 
         self.state = -1
 
+    @staticmethod
+    def factory_type(ttype):
+        if ttype in [0x11]:
+            return TypicalT1n(ttype)
+        else:
+            _LOGGER.error('Type %d not implemented' % ttype)
+            return None
+
     def update(self, value):
-        value = ':'.join("{:02x}".format(ord(c)) for c in value[:self.size])
+        #value = ':'.join("{:02x}".format(ord(c)) for c in value[:self.size])
         if value != self.state:
-            _LOGGER.info(str(self.index) + " - " + self.description + " updated to " + value)
+            _LOGGER.info(str(self.index) + " - " + self.description + " updated to " +
+                         ':'.join("{:02x}".format(ord(c)) for c in value[:self.size]))
             self.state = value
             """
             if self.mqtt:
@@ -120,6 +128,20 @@ class Typical:
         return {'ddesc': self.description,
                 'slo': self.slot,
                 'typ': self.ttype}
+
+class TypicalT1n(Typical):
+
+    def __init__(self, ttype):
+        super(TypicalT1n,self).__init__(ttype)
+
+    def send_command(self, command):
+        if command == 0x01:  # toggle
+            if self.state == chr(1):
+                self.update(chr(0))
+            else:
+                self.update(chr(1))
+        else:
+            _LOGGER.debug('Command %x not implemented' % command)
 
 
 class Node:
@@ -188,7 +210,7 @@ class Souliss:
 
         vnet_frame = VNet_frame(self.node_index, self.user_index, macaco_frame)
         # TODO - no se ve la cabecera vnet
-        _LOGGER.debug('received  <- %s ' % (vnet_frame.to_str()))
+        _LOGGER.debug('received <- %s ' % (vnet_frame.to_str()))
 
         if macaco_frame.functional_code == 0x31:
             # for i in range(macaco_frame.start_offset, min(macaco_frame.number_of,len(self.nodes[0].typicals))) :
@@ -209,7 +231,7 @@ class Souliss:
 
         if res:
             num_nodes = ord(res[12])
-            _LOGGER.debug("%d nodes found" % num_nodes)
+            _LOGGER.info("%d nodes found" % num_nodes)
 
             for n in range(num_nodes):
                 new_node = Node(n)
@@ -220,13 +242,29 @@ class Souliss:
                     for t in range(num_typicals):
                         tipo = ord(res[12+t])
                         if tipo > 0 and tipo < 255:
-                            new_node.add_typical(Typical(tipo))
+                            new_node.add_typical(Typical.factory_type(tipo))
+
                 self.nodes.append(new_node)
             _LOGGER.info('database_structure_request OK')
             return True
         else:
             _LOGGER.error('No response for database_structure_request ')
             return False
+
+    # Send command to node/typical
+    def send_command(self, command, node_num, typical_num):
+
+        # sanitize parameters
+        if type(node_num) is str:
+            node_num = int(node_num)
+        if type(typical_num) is str:
+            typical_num = int(typical_num)
+        if type(command) is str:
+            command = int(command)
+
+        _LOGGER.debug('Sending %02x to node %d - typical %d', command, node_num, typical_num)
+        typical = self.nodes[node_num].typicals[typical_num]
+        typical.send_command(command)
 
     def dump_structure(self):
         for n in self.nodes:

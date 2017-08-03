@@ -7,6 +7,7 @@ MACACO_DESC = {
     0x05: 'Subscription request',
     0x15: 'Subscription answer',
     0x26: 'Database structure request',
+    0x36: 'Database structure answer',
     0x22: 'Read typical logic request',
     0x32: 'Read typical logic answer',
     0x21: 'Read state request with subscription',
