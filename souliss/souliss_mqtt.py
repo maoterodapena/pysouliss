@@ -5,6 +5,7 @@ import sys
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class souliss_mqtt:
 
     """
@@ -64,8 +65,14 @@ class souliss_mqtt:
         else:
             _LOGGER.error("Action must be 'cmd' or 'get'")
 
+    def publish_change(self, typical):
+        self.mqttc.publish('pysouliss/%d/%d' % (typical.index, typical.slot), typical.state)
+
     def loop_forever(self):
         self.souliss.subscribe_all_typicals(0)
+        for ty in self.souliss.nodes[0].typicals:
+            ty.add_listener(self.publish_change)
+
         self.mqttc.loop_start()
         while True:
             self.souliss.get_response()

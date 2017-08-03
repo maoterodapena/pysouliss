@@ -74,9 +74,13 @@ class Typical(object):
         self.ttype = ttype
         self.description = typical_types[ttype]['desc']
         self.size = typical_types[ttype]['size']
-        self.slot = -1  # undefined until added to a node
+        self.slot = -1  # undefined until assigned to a slot
 
         self.state = -1
+        self.listeners = []
+
+    def add_listener(self, callback):
+        self.listeners.append(callback)
 
     @staticmethod
     def factory_type(ttype):
@@ -92,6 +96,9 @@ class Typical(object):
             _LOGGER.info(str(self.index) + " - " + self.description + " updated to " +
                          ':'.join("{:02x}".format(ord(c)) for c in value[:self.size]))
             self.state = value
+
+            for listener in self.listeners:
+                listener(self)
             """
             if self.mqtt:
                 # TODO: este self....
@@ -259,12 +266,9 @@ class Souliss:
             node_num = int(node_num)
         if type(typical_num) is str:
             typical_num = int(typical_num)
-        if type(command) is str:
-            command = int(command)
 
         _LOGGER.debug('Sending %02x to node %d - typical %d', command, node_num, typical_num)
-        typical = self.nodes[node_num].typicals[typical_num]
-        typical.send_command(command)
+        self.send(SOULISS_FC_FORCE_REQUEST, 1, command)
 
     def dump_structure(self):
         for n in self.nodes:
