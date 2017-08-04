@@ -35,4 +35,4 @@ class VNet_frame:
                 self.payload.get_raw())
 
     def to_str(self):
-        return ":".join("{:02x}".format(ord(c)) for c in self.get_raw()) + " : " + self.payload.to_str()
+        return ":".join("{:02x}".format(c) for c in self.get_raw()) + " : " + self.payload.to_str()

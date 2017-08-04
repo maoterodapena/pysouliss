@@ -50,12 +50,10 @@ class souliss_mqtt:
         _LOGGER.debug("Received "+msg.topic+" "+str(msg.payload))
 
         # TODO: Caution! No control about messages. This is just a demo
-        # and only works with T11
         try:
             (prefix, node, typical, action) = msg.topic.split("/")
         except:
-            _LOGGER.error("Message not is not like 'pysouliss/nodenum/typicalnum/action'")
-            return False
+            return True
 
         if action == 'cmd':
             _LOGGER.debug("Send command %s to node %s / typical %s", msg.payload, node, typical)

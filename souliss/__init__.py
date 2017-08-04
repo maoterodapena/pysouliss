@@ -2,10 +2,9 @@
 import logging
 import socket
 import json
-from Macaco_frame import Macaco_frame
-from VNet_frame import VNet_frame
+from .Macaco_frame import Macaco_frame
+from .VNet_frame import VNet_frame
 import sys
-import pickle
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,13 +21,15 @@ SOULISS_FC_FORCE_REGISTER_VALUE_OR = 0x17               # TODO
 SOULISS_FC_PING = 0x08
 
 # Gateway FC's
-SOULISS_FC_READ_STATE_REQUEST_WITH_SUBSCRIPTION = 0x21  # TODO
-SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST = 0x22            # TODO
-SOULISS_FC_FORCE_REQUEST = 0x33                         # TODO
-SOULISS_FC_NODES_HEALTHY_REQUEST = 0x25                 # TODO
-SOULISS_FC_DATABASE_STRUCTURE_REQUEST = 0x26            # TODO
-SOULISS_FC_DATA_REQUEST = 0x27                          # TODO
-SOULISS_FC_DISCOVER_GATEWAY_REQUEST = 0x28              # TODO
+SOULISS_FC_DATABASE_STRUCTURE_REQUEST = 0x26
+SOULISS_FC_DATABASE_STRUCTURE_ANSWER = 0x36
+SOULISS_FC_READ_STATE_REQUEST_WITH_SUBSCRIPTION = 0x21
+SOULISS_FC_READ_STATE_ANSWER = 0x31
+SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST = 0x22
+SOULISS_FC_FORCE_REQUEST = 0x33
+SOULISS_FC_NODES_HEALTHY_REQUEST = 0x25
+SOULISS_FC_DATA_REQUEST = 0x27
+SOULISS_FC_DISCOVER_GATEWAY_REQUEST = 0x28
 
 # TODO: Dynamic network configuration
 
@@ -76,7 +77,8 @@ class Typical(object):
         self.size = typical_types[ttype]['size']
         self.slot = -1  # undefined until assigned to a slot
 
-        self.state = -1
+        # inital state. It will be overwritten with the first update
+        self.state = b'\x00\x00\x00\x00\x00\x00\x00'
         self.listeners = []
 
     def add_listener(self, callback):
@@ -84,17 +86,20 @@ class Typical(object):
 
     @staticmethod
     def factory_type(ttype):
-        if ttype in [0x11]:
+        if ttype in [0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x18, 0x19, 0x1A, 0x1B]:
             return TypicalT1n(ttype)
+        elif ttype in [0x51, 0x522, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58]:
+            return TypicalT5n(ttype)
         else:
-            _LOGGER.error('Type %d not implemented' % ttype)
-            return None
+            return TypicalNotImplemented(ttype)
 
     def update(self, value):
-        #value = ':'.join("{:02x}".format(ord(c)) for c in value[:self.size])
+        value = value[:self.size]
         if value != self.state:
-            _LOGGER.info(str(self.index) + " - " + self.description + " updated to " +
-                         ':'.join("{:02x}".format(ord(c)) for c in value[:self.size]))
+            _LOGGER.info("%d - %s updated from %s to %s" % (self.index,
+                self.description,
+                ':'.join("{:02x}".format(c) for c in self.state[:self.size]),
+                ':'.join("{:02x}".format(c) for c in value[:self.size])))
             self.state = value
 
             for listener in self.listeners:
@@ -142,13 +147,27 @@ class TypicalT1n(Typical):
         super(TypicalT1n,self).__init__(ttype)
 
     def send_command(self, command):
-        if command == 0x01:  # toggle
+        # TODO: Handle different T1 behaviour
+        if command == 0x01:  # Toggle
             if self.state == chr(1):
                 self.update(chr(0))
             else:
                 self.update(chr(1))
+        elif command == 0x02:  # OnCmd
+            self.update(chr(0))
+        elif command == 0x04:  # OffCmd
+            self.update(chr(1))
         else:
             _LOGGER.debug('Command %x not implemented' % command)
+
+class TypicalT5n(Typical):
+    def __init__(self, ttype):
+        super(TypicalT5n,self).__init__(ttype)
+
+class TypicalNotImplemented(Typical):
+    def __init__(self, ttype):
+        _LOGGER.warning('Typical %x not implemented' % ttype)
+        super(TypicalNotImplemented,self).__init__(ttype)
 
 
 class Node:
@@ -159,8 +178,9 @@ class Node:
         pass
 
     def add_typical(self, typical):
-        typical.set_slot_index(self.next_slot, len(self.typicals))
-        self.typicals.append(typical)
+        if typical is not None:
+            typical.set_slot_index(self.next_slot, len(self.typicals))
+            self.typicals.append(typical)
         self.next_slot = self.next_slot + typical.size
 
     def to_dict(self):
@@ -219,14 +239,14 @@ class Souliss:
         # TODO - no se ve la cabecera vnet
         _LOGGER.debug('received <- %s ' % (vnet_frame.to_str()))
 
-        if macaco_frame.functional_code == 0x31:
-            # for i in range(macaco_frame.start_offset, min(macaco_frame.number_of,len(self.nodes[0].typicals))) :
+        if macaco_frame.functional_code == SOULISS_FC_READ_STATE_ANSWER:
             mem = macaco_frame.start_offset
             typical_index = 0
-            while mem < len(macaco_frame.payload):
-                self.nodes[0].typicals[typical_index].update(macaco_frame.payload[typical_index:])
+            while typical_index < len(self.nodes[0].typicals):
+                # print("Hasta: %d Typical index %d - Mem = %d" % (len(self.nodes[0].typicals), typical_index, mem))
+                self.nodes[0].typicals[typical_index].update(macaco_frame.payload[mem:])
                 mem = mem + self.nodes[0].typicals[typical_index].size
-                typical_index = 0
+                typical_index = typical_index + 1
 
         return data
 
@@ -237,7 +257,7 @@ class Souliss:
         # _LOGGER.info(Macaco_frame.decode(res))
 
         if res:
-            num_nodes = ord(res[12])
+            num_nodes = res[12]
             _LOGGER.info("%d nodes found" % num_nodes)
 
             for n in range(num_nodes):
@@ -245,11 +265,24 @@ class Souliss:
                 self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, num_nodes)
                 res = self.get_response(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST)
                 if res:
-                    num_typicals = ord(res[11])
-                    for t in range(num_typicals):
-                        tipo = ord(res[12+t])
-                        if tipo > 0 and tipo < 255:
+                    size_payload = res[11]
+                    mem = 0
+                    while (mem < size_payload):
+                        # print("itero: %d. Mem = %d" % (size_payload, mem))
+                        tipo = res[12+mem]
+                        # TODO: Why gateway responds payloads with empty
+                        # typicals?
+                        if tipo == 0:
+                            mem = mem + 1
+                            continue
+                        if tipo in typical_types.keys():
                             new_node.add_typical(Typical.factory_type(tipo))
+                            _LOGGER.info('Added typical ' + hex(tipo) + ':' +
+                                         typical_types[tipo]['desc'])
+                            mem = mem + typical_types[tipo]['size']
+                        else:
+                            _LOGGER.error('Typical ' + hex(tipo) + ' not implemented')
+
 
                 self.nodes.append(new_node)
             _LOGGER.info('database_structure_request OK')

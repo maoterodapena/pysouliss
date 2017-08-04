@@ -28,10 +28,10 @@ class Macaco_frame:
 
     @staticmethod
     def from_data(data):
-        functional_code = ord(data[0])
-        put_in = ord(data[1]) * 256 + ord(data[2])
-        start_offset = ord(data[3])
-        number_of = ord(data[4])
+        functional_code = data[0]
+        put_in = data[1] * 256 + data[2]
+        start_offset = data[3]
+        number_of = data[4]
         payload = data[5:]
         mc = Macaco_frame(functional_code, put_in, start_offset, number_of, payload)
         return mc

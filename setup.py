@@ -16,7 +16,7 @@ setup(
     author='Miguel Otero',
     author_email='maoterodapena@gmail.com',
     license='MIT License',
-    install_requires=[],
+    install_requires=['paho-mqtt'],
     packages=find_packages(exclude=['tests', 'tests.*']),
     keywords=['sensor', 'actuator', 'IoT', 'DYI'],
     zip_safe=True,
