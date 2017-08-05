@@ -208,7 +208,7 @@ class Souliss:
 
     def send(self, functional_code, number_of=0, macaco_payload=None):
         macaco_frame = Macaco_frame(functional_code, 0, 0, number_of, macaco_payload)
-        vnet_frame = VNet_frame(self.node_index, self.user_index, macaco_frame)
+        vnet_frame = VNet_frame(self, macaco_frame)
 
         _LOGGER.debug('sending  -> %s ' % (vnet_frame.to_str()))
 
@@ -235,7 +235,7 @@ class Souliss:
 
         macaco_frame = Macaco_frame.from_data(data[7:])
 
-        vnet_frame = VNet_frame(self.node_index, self.user_index, macaco_frame)
+        vnet_frame = VNet_frame(self, macaco_frame)
         # TODO - no se ve la cabecera vnet
         _LOGGER.debug('received <- %s ' % (vnet_frame.to_str()))
 

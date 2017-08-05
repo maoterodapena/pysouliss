@@ -3,7 +3,7 @@ from struct import pack
 
 class VNet_frame:
 
-    def __init__(self, node_index=0, user_index=0, payload=''):
+    def __init__(self, souliss_object, payload=''):
         if payload == '':
             pass
         else:
@@ -12,7 +12,8 @@ class VNet_frame:
             self.port = 0x17
 
             # last number of gateway IP (if netmask = 255.255.255.0)
-            self.destino_final = 17*256
+            lip = souliss_object.gateway_ip.split(".")
+            self.destino_final = int(lip[3])*256
 
             # Obtained from souliss app (why??? don't remember :(
             self.destino_original = 16    # TODO: works with any number!
