@@ -38,7 +38,7 @@ if __name__ == "__main__":
     ok = SOULISS.database_structure_request()
 
     if ok:
-        SOULISS.subscribe_all_typicals(0)  # subscribe to all typicals on node 0
+        SOULISS.subscribe_all_typicals()
         while True:
             SOULISS.get_response()
     else:

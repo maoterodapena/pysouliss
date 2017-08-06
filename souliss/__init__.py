@@ -45,7 +45,7 @@ class Node:
 
     def add_typical(self, typical):
         if typical is not None:
-            typical.set_slot_index(self.next_slot, len(self.typicals))
+            typical.set_node_slot_index(self.index, self.next_slot, len(self.typicals))
             self.typicals.append(typical)
         self.next_slot = self.next_slot + typical.size
 
@@ -81,17 +81,18 @@ class Souliss:
         self.socket.sendto(vnet_frame.get_raw(), self.server_address)
         return vnet_frame.get_raw()
 
-    def subscribe_all_typicals(self, node):
-        self.send(SOULISS_FC_READ_STATE_REQUEST_WITH_SUBSCRIPTION,
+    def subscribe_all_typicals(self):
+        for node in range(len(self.nodes)):
+            self.send(SOULISS_FC_READ_STATE_REQUEST_WITH_SUBSCRIPTION,
                len(self.nodes[node].typicals))
 
     def get_response(self, expected_response=None):
         # _LOGGER.info('waiting response... %s' % "{:02x}".format(response_code + RESPONSE))
         try:
             if expected_response is None:
-                self.socket.settimeout(5)
+                self.socket.settimeout(15)
             else:
-                self.socket.settimeout(5)
+                self.socket.settimeout(15)
 
             data, server = self.socket.recvfrom(1024)
         except KeyboardInterrupt:
@@ -100,17 +101,16 @@ class Souliss:
             return False
 
         macaco_frame = Macaco_frame.from_data(data[7:])
-
         vnet_frame = VNet_frame(self, macaco_frame)
-        # TODO - no se ve la cabecera vnet
+
         _LOGGER.debug('received <- %s ' % (vnet_frame.to_str()))
 
         if macaco_frame.functional_code == SOULISS_FC_READ_STATE_ANSWER:
-            mem = macaco_frame.start_offset
+            node = macaco_frame.start_offset
             typical_index = 0
-            while typical_index < len(self.nodes[0].typicals):
-                # print("Hasta: %d Typical index %d - Mem = %d" % (len(self.nodes[0].typicals), typical_index, mem))
-                self.nodes[0].typicals[typical_index].update(macaco_frame.payload[mem:])
+            mem = 0
+            while typical_index < len(self.nodes[node].typicals):
+                self.nodes[node].typicals[typical_index].update(macaco_frame.payload[mem:])
                 mem = mem + self.nodes[0].typicals[typical_index].size
                 typical_index = typical_index + 1
 
@@ -126,15 +126,14 @@ class Souliss:
             num_nodes = res[12]
             _LOGGER.info("%d nodes found" % num_nodes)
 
+            self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, num_nodes)
             for n in range(num_nodes):
                 new_node = Node(n)
-                self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, num_nodes)
                 res = self.get_response(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST)
                 if res:
                     size_payload = res[11]
                     mem = 0
                     while (mem < size_payload):
-                        # print("itero: %d. Mem = %d" % (size_payload, mem))
                         tipo = res[12+mem]
                         # TODO: Why gateway responds payloads with empty
                         # typicals?
@@ -143,11 +142,11 @@ class Souliss:
                             continue
                         if tipo in Typicals.typical_types.keys():
                             new_node.add_typical(Typical.factory_type(tipo))
-                            _LOGGER.info('Added typical ' + hex(tipo) + ':' +
-                                         Typicals.typical_types[tipo]['desc'])
+                            _LOGGER.info('Node %d. Added typical %s: %s' % (n, hex(tipo),Typicals.typical_types[tipo]['desc']))
                             mem = mem + Typicals.typical_types[tipo]['size']
                         else:
                             _LOGGER.error('Typical ' + hex(tipo) + ' not implemented')
+                            sys.exit(1)
 
 
                 self.nodes.append(new_node)

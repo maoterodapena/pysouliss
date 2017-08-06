@@ -38,9 +38,9 @@ class Macaco_frame:
 
     def get_raw(self):
         if self.payload:
-            return pack('!BHBB', self.functional_code, 0, 0, self.number_of) + self.payload
+            return pack('!BHBB', self.functional_code, self.put_in, self.start_offset, self.number_of) + self.payload
         else:
-            return pack('!BHBB', self.functional_code, 0, 0, self.number_of)
+            return pack('!BHBB', self.functional_code, self.put_in, self.start_offset, self.number_of)
 
     def len(self):
         return len(self.get_raw())
