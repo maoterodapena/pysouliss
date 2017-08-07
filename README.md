@@ -14,7 +14,7 @@ SOULISS = souliss.Souliss('192.168.1.77')
 ok = SOULISS.database_structure_request()
 
 if ok:
-    SOULISS.subscribe_all_typicals(0) # subscribe to all typicals on node 0
+    SOULISS.subscribe_all_typicals() # subscribe to all typicals
     while True:
         SOULISS.get_response()
 ```

@@ -28,6 +28,7 @@ SOULISS_FC_DATABASE_STRUCTURE_ANSWER = 0x36
 SOULISS_FC_READ_STATE_REQUEST_WITH_SUBSCRIPTION = 0x21
 SOULISS_FC_READ_STATE_ANSWER = 0x31
 SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST = 0x22
+SOULISS_FC_READ_TYPICAL_LOGIC_ANSWER = 0x32
 SOULISS_FC_FORCE_REQUEST = 0x33
 SOULISS_FC_NODES_HEALTHY_REQUEST = 0x25
 SOULISS_FC_DATA_REQUEST = 0x27
@@ -126,12 +127,23 @@ class Souliss:
             num_nodes = res[12]
             _LOGGER.info("%d nodes found" % num_nodes)
 
-            self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, num_nodes)
+            # Create the nodes
             for n in range(num_nodes):
-                new_node = Node(n)
+                self.nodes.append(Node(n))
+
+            # Request logic for all nodes
+            self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, num_nodes)
+
+            # Receive all the responses
+            nodes_received = 0
+            while (nodes_received < num_nodes):
+
                 res = self.get_response(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST)
-                if res:
+                if res[7] == SOULISS_FC_READ_TYPICAL_LOGIC_ANSWER:
+                    print("recibi un answer")
+                    nodes_received = nodes_received + 1
                     size_payload = res[11]
+                    node = res[10]
                     mem = 0
                     while (mem < size_payload):
                         tipo = res[12+mem]
@@ -141,15 +153,14 @@ class Souliss:
                             mem = mem + 1
                             continue
                         if tipo in Typicals.typical_types.keys():
-                            new_node.add_typical(Typical.factory_type(tipo))
-                            _LOGGER.info('Node %d. Added typical %s: %s' % (n, hex(tipo),Typicals.typical_types[tipo]['desc']))
+                            self.nodes[node].add_typical(Typical.factory_type(tipo))
+                            _LOGGER.info('Node %d. Added typical %s: %s' % (node, hex(tipo),Typicals.typical_types[tipo]['desc']))
                             mem = mem + Typicals.typical_types[tipo]['size']
                         else:
                             _LOGGER.error('Typical ' + hex(tipo) + ' not implemented')
                             sys.exit(1)
 
 
-                self.nodes.append(new_node)
             _LOGGER.info('database_structure_request OK')
             return True
         else:
