@@ -106,25 +106,12 @@ class Souliss:
 
         _LOGGER.debug('received <- %s ' % (vnet_frame.to_str()))
 
-        if macaco_frame.functional_code == SOULISS_FC_READ_STATE_ANSWER:
-            node = macaco_frame.start_offset
-            typical_index = 0
-            mem = 0
-            while typical_index < len(self.nodes[node].typicals):
-                self.nodes[node].typicals[typical_index].update(macaco_frame.payload[mem:])
-                mem = mem + self.nodes[0].typicals[typical_index].size
-                typical_index = typical_index + 1
+        self.process(macaco_frame)
 
-        return data
+    def process(self, macaco_frame):
 
-    def database_structure_request(self):
-        _LOGGER.info('Trying to connect to gateway')
-        self.send(SOULISS_FC_DATABASE_STRUCTURE_REQUEST)
-        res = self.get_response(SOULISS_FC_DATABASE_STRUCTURE_REQUEST)
-        # _LOGGER.info(Macaco_frame.decode(res))
-
-        if res:
-            num_nodes = res[12]
+        if macaco_frame.functional_code == SOULISS_FC_DATABASE_STRUCTURE_ANSWER:
+            num_nodes = macaco_frame.payload[0]
             _LOGGER.info("%d nodes found" % num_nodes)
 
             # Create the nodes
@@ -134,38 +121,43 @@ class Souliss:
             # Request logic for all nodes
             self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, num_nodes)
 
-            # Receive all the responses
-            nodes_received = 0
-            while (nodes_received < num_nodes):
 
-                res = self.get_response(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST)
-                if res[7] == SOULISS_FC_READ_TYPICAL_LOGIC_ANSWER:
-                    print("recibi un answer")
-                    nodes_received = nodes_received + 1
-                    size_payload = res[11]
-                    node = res[10]
-                    mem = 0
-                    while (mem < size_payload):
-                        tipo = res[12+mem]
-                        # TODO: Why gateway responds payloads with empty
-                        # typicals?
-                        if tipo == 0:
-                            mem = mem + 1
-                            continue
-                        if tipo in Typicals.typical_types.keys():
-                            self.nodes[node].add_typical(Typical.factory_type(tipo))
-                            _LOGGER.info('Node %d. Added typical %s: %s' % (node, hex(tipo),Typicals.typical_types[tipo]['desc']))
-                            mem = mem + Typicals.typical_types[tipo]['size']
-                        else:
-                            _LOGGER.error('Typical ' + hex(tipo) + ' not implemented')
-                            sys.exit(1)
+        elif macaco_frame.functional_code == SOULISS_FC_READ_TYPICAL_LOGIC_ANSWER:
+            node = macaco_frame.start_offset
+            mem = 0
+            while (mem < macaco_frame.number_of):
+                tipo = macaco_frame.payload[mem]
+                # TODO: Why gateway responds payloads with empty
+                # typicals?
+                if tipo == 0:
+                    mem = mem + 1
+                    continue
+                if tipo in Typicals.typical_types.keys():
+                    self.nodes[node].add_typical(Typical.factory_type(tipo))
+                    _LOGGER.info('Node %d. Added typical %s: %s' % (node, hex(tipo),Typicals.typical_types[tipo]['desc']))
+                    mem = mem + Typicals.typical_types[tipo]['size']
+                else:
+                    _LOGGER.warning('Typical ' + hex(tipo) + ' not implemented')
 
+            self.send(SOULISS_FC_READ_STATE_REQUEST_WITH_SUBSCRIPTION, node)
 
-            _LOGGER.info('database_structure_request OK')
-            return True
+        elif macaco_frame.functional_code == SOULISS_FC_READ_STATE_ANSWER:
+            node = macaco_frame.start_offset
+            typical_index = 0
+            mem = 0
+            while typical_index < len(self.nodes[node].typicals):
+                self.nodes[node].typicals[typical_index].update(macaco_frame.payload[mem:])
+                mem = mem + self.nodes[0].typicals[typical_index].size
+                typical_index = typical_index + 1
+
         else:
-            _LOGGER.error('No response for database_structure_request ')
-            return False
+            _LOGGER.warning("Functional code not implemented")
+
+
+
+    def database_structure_request(self):
+        _LOGGER.info('Trying to connect to gateway')
+        self.send(SOULISS_FC_DATABASE_STRUCTURE_REQUEST)
 
     # Send command to node/typical
     def send_command(self, command, node_num, typical_num):

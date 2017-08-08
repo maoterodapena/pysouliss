@@ -35,11 +35,9 @@ if __name__ == "__main__":
 
     # Try to connect to souliss gateway
     SOULISS = souliss.Souliss(options.gateway)
-    ok = SOULISS.database_structure_request()
+    SOULISS.database_structure_request()
 
-    if ok:
-        SOULISS.subscribe_all_typicals()
-        while True:
-            SOULISS.get_response()
+    while True:
+        SOULISS.get_response()
     else:
         print("Terminated")

@@ -11,13 +11,11 @@ python main.py -v -g <ip-gateway>
 ```python
 import souliss.souliss as souliss
 SOULISS = souliss.Souliss('192.168.1.77')
-ok = SOULISS.database_structure_request()
+SOULISS.database_structure_request()
 
-if ok:
-    SOULISS.subscribe_all_typicals() # subscribe to all typicals
-    while True:
-        SOULISS.get_response()
+while True:
+    SOULISS.get_response()
 ```
 
-In the above example PySouliss will get the nodes and typicals on the gateway and start listening to events on node 0, keeping an internal state of each typical and showing a messagge if something changes.
+In the above example PySouliss will get the nodes and typicals on the gateway and start listening to events, keeping an internal state of each typical and showing a messagge if something changes.
 
