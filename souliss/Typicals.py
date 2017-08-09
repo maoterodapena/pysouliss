@@ -178,7 +178,7 @@ class TypicalT1n(Typical):
         if value != self.state:
             self.state = value
             if self.size > 1: # Raw description for Typicals T15, T16 and T19 
-                self.state_description = value
+                self.state_description = ':'.join("{:02x}".format(c) for c in self.state)
             else:
                 self.state_description = self.state_desc[ord(value)]
 
