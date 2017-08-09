@@ -19,10 +19,13 @@ class souliss_mqtt:
 
         # Try to connect to Souliss
         self.souliss = souliss.Souliss(souliss_gateway)
-        ok = self.souliss.database_structure_request()
-        if ok is False:
+        if self.souliss.database_structure_request():
+            self.souliss.get_response()
+        if not self.souliss.is_connected():
             _LOGGER.error("Could not connect to souliss gateway at " + souliss_gateway)
             return None
+
+        self.souliss.set_typical_update_callback(self.publish_change)
 
         # Try to connec to mqtt broker
         self.mqttc = mqtt.Client()
@@ -35,6 +38,7 @@ class souliss_mqtt:
                           (sys.exc_info()[1]))
             return None
         _LOGGER.info("Connected to mqtt broker at " + mqtt_broker_ip)
+
         self.is_connected = True
 
     # The callback for when the client receives a CONNACK response from the server.

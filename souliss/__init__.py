@@ -7,6 +7,7 @@ from .Macaco_frame import Macaco_frame
 from .VNet_frame import VNet_frame
 import sys
 import struct
+import time
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,42 +37,46 @@ SOULISS_FC_DISCOVER_GATEWAY_REQUEST = 0x28
 
 # TODO: Dynamic network configuration
 
-
 class Node:
+    # constructor
     def __init__(self, i):
-        self.index = i
-        self.typicals = []
-        self.next_slot = 0
-        pass
+        self.index = i          # index of the typical
+        self.typicals = []      # list of typicals 
+        self.next_slot = 0      # used internally. When a typical is added to a node,
+                                #   next_slot is incremented
 
+    # add a typical to a node previously created
     def add_typical(self, typical):
-        if typical is not None:
-            typical.set_node_slot_index(self.index, self.next_slot, len(self.typicals))
-            self.typicals.append(typical)
+        self.typicals.append(typical)
+        # once a typical belongs to a node, we store node index and slot in it
+        typical.set_node_slot_index(self.index, self.next_slot, len(self.typicals))
         self.next_slot = self.next_slot + typical.size
 
     def to_dict(self):
         return {'ndesc': 'Nodo ' + str(self.index),
                 'slot': [t.to_dict() for t in self.typicals]}
 
-
 class Souliss:
-    # pylint: disable=too-many-instance-attributes
 
+    # constructor
     def __init__(self, gateway_ip, node_index=33, user_index=44):
         self.gateway_ip = gateway_ip
-        self.server_address = (gateway_ip, 230)
+        self.server_address = (gateway_ip, 230)  # default port on souliss
         self.node_index = node_index
         self.user_index = user_index
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.socket.settimeout(5)
+        self.socket.settimeout(15)
 
-        self.available = False
+        self.connected = False
+        self.typical_update_callback = None
         self.nodes = []
 
-    def is_available(self):
-        self.send(SOULISS_FC_PING)
-        return self.get_response() != False
+    def is_connected(self):
+        return self.connected
+
+    def set_typical_update_callback(self, callback):
+        # This callback is called whenever a typical is updated.
+        self.typical_update_callback= callback;
 
     def send(self, functional_code, number_of=0, macaco_payload=None):
         macaco_frame = Macaco_frame(functional_code, 0, 0, number_of, macaco_payload)
@@ -79,22 +84,23 @@ class Souliss:
 
         _LOGGER.debug('sending  -> %s ' % (vnet_frame.to_str()))
 
-        self.socket.sendto(vnet_frame.get_raw(), self.server_address)
-        return vnet_frame.get_raw()
+        try:
+            self.socket.sendto(vnet_frame.get_raw(), self.server_address)
+        except:
+            _LOGGER.error("Could not connect to souliss gateway. %s" %
+                          (sys.exc_info()[1]))
+            return False 
+        return True
 
     def subscribe_all_typicals(self):
         for node in range(len(self.nodes)):
             self.send(SOULISS_FC_READ_STATE_REQUEST_WITH_SUBSCRIPTION,
                len(self.nodes[node].typicals))
+            time.sleep(0.3)
 
     def get_response(self, expected_response=None):
         # _LOGGER.info('waiting response... %s' % "{:02x}".format(response_code + RESPONSE))
         try:
-            if expected_response is None:
-                self.socket.settimeout(15)
-            else:
-                self.socket.settimeout(15)
-
             data, server = self.socket.recvfrom(1024)
         except KeyboardInterrupt:
             sys.exit(0)
@@ -103,9 +109,9 @@ class Souliss:
 
         macaco_frame = Macaco_frame.from_data(data[7:])
         vnet_frame = VNet_frame(self, macaco_frame)
+        self.connected = True
 
         _LOGGER.debug('received <- %s ' % (vnet_frame.to_str()))
-
         self.process(macaco_frame)
 
     def process(self, macaco_frame):
@@ -114,41 +120,55 @@ class Souliss:
             num_nodes = macaco_frame.payload[0]
             _LOGGER.info("%d nodes found" % num_nodes)
 
-            # Create the nodes
+            # Re create the nodes
+            self.nodes = []
             for n in range(num_nodes):
                 self.nodes.append(Node(n))
 
             # Request logic for all nodes
             self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, num_nodes)
 
-
         elif macaco_frame.functional_code == SOULISS_FC_READ_TYPICAL_LOGIC_ANSWER:
             node = macaco_frame.start_offset
-            mem = 0
-            while (mem < macaco_frame.number_of):
-                tipo = macaco_frame.payload[mem]
-                # TODO: Why gateway responds payloads with empty
-                # typicals?
-                if tipo == 0:
-                    mem = mem + 1
-                    continue
-                if tipo in Typicals.typical_types.keys():
-                    self.nodes[node].add_typical(Typical.factory_type(tipo))
-                    _LOGGER.info('Node %d. Added typical %s: %s' % (node, hex(tipo),Typicals.typical_types[tipo]['desc']))
-                    mem = mem + Typicals.typical_types[tipo]['size']
-                else:
-                    _LOGGER.warning('Typical ' + hex(tipo) + ' not implemented')
+            if node > len(self.nodes):
+                _LOGGER.debug('Received state for node %d, but does not exist! Retrying query database' % node)
+                self.send(SOULISS_FC_DATABASE_STRUCTURE_REQUEST)
+            elif len(self.nodes[node].typicals) > 0:
+                _LOGGER.debug('Duplicate response for node %d. Discarting.' % node)
+            else:
+                mem = 0
+                while (mem < macaco_frame.number_of):
+                    tipo = macaco_frame.payload[mem]
+                    # TODO: Why gateway responds payloads with empty
+                    # typicals?
+                    if tipo == 0:
+                        mem = mem + 1
+                        continue
+                    if tipo in Typicals.typical_types.keys():
+                        new_typical = Typical.factory_type(tipo)
+                        if self.typical_update_callback is not None:
+                            new_typical.add_listener(self.typical_update_callback)
+                        self.nodes[node].add_typical(new_typical)
+                        _LOGGER.info('Node %d. Added typical %s: %s' % (node, hex(tipo),Typicals.typical_types[tipo]['desc']))
+                        mem = mem + Typicals.typical_types[tipo]['size']
+                    else:
+                        _LOGGER.warning('Typical ' + hex(tipo) + ' not implemented')
 
-            self.send(SOULISS_FC_READ_STATE_REQUEST_WITH_SUBSCRIPTION, node)
+                self.send(SOULISS_FC_READ_STATE_REQUEST_WITH_SUBSCRIPTION, node)
 
         elif macaco_frame.functional_code == SOULISS_FC_READ_STATE_ANSWER:
             node = macaco_frame.start_offset
-            typical_index = 0
-            mem = 0
-            while typical_index < len(self.nodes[node].typicals):
-                self.nodes[node].typicals[typical_index].update(macaco_frame.payload[mem:])
-                mem = mem + self.nodes[0].typicals[typical_index].size
-                typical_index = typical_index + 1
+            if node > len(self.nodes) or len(self.nodes[node].typicals) == 0:
+            # Node still empty. May be READ_TYPICAL_LOGIC_ANSWER was lost
+                _LOGGER.debug('Received state for node %d, but does not exist. Retrying' % node)
+                self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, len(self.nodes))
+            else:
+                typical_index = 0
+                mem = 0
+                while typical_index < len(self.nodes[node].typicals):
+                    self.nodes[node].typicals[typical_index].update(macaco_frame.payload[mem:])
+                    mem = mem + self.nodes[node].typicals[typical_index].size
+                    typical_index = typical_index + 1
 
         else:
             _LOGGER.warning("Functional code not implemented")
@@ -157,7 +177,7 @@ class Souliss:
 
     def database_structure_request(self):
         _LOGGER.info('Trying to connect to gateway')
-        self.send(SOULISS_FC_DATABASE_STRUCTURE_REQUEST)
+        return self.send(SOULISS_FC_DATABASE_STRUCTURE_REQUEST)
 
     # Send command to node/typical
     def send_command(self, command, node_num, typical_num):

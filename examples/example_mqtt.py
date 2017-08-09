@@ -43,7 +43,9 @@ if __name__ == "__main__":
     sm = souliss_mqtt.souliss_mqtt(options.gateway,
                               options.mqtt_ip,
                               options.mqtt_port)
+    #a = souliss_mqtt.souliss_mqtt("192.168.1.41", "localhost", 1883)
 
     time.sleep(1)
     if sm.is_connected:
         sm.loop_forever()
+    print("Terminated") 
