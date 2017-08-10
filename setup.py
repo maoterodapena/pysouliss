@@ -9,7 +9,7 @@ else:
 
 setup(
     name='pysouliss',
-    version='0.0.3',
+    version='0.0.4',
     description='Python API for talking to a Souliss gateway gateway',
     long_description=README,
     url='https://github.com/maoterodapena/pysouliss',
