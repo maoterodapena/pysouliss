@@ -1,10 +1,17 @@
 # pysouliss
-Python API for talking to a Souliss gateway (http://souliss.net/). This is a very early stage of the project.
+Python API for talking to a Souliss gateway (http://souliss.net/). This is a very early stage of the project. Python 3.6.2 is required
+
 
 # Demo
 After cloning the repository you can test it with your actual configuration with:
 ```
 python main.py -v -g <ip-gateway>
+```
+
+# Install
+Install with 
+```
+pip install -e /path/to/your/cloned/folder
 ```
 
 # Usage

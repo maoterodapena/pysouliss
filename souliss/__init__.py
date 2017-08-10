@@ -9,6 +9,8 @@ import sys
 import struct
 import time
 
+import random   # just for testing, discarting random response packages
+
 _LOGGER = logging.getLogger(__name__)
 
 RESPONSE = 0x10
@@ -49,7 +51,7 @@ class Node:
     def add_typical(self, typical):
         self.typicals.append(typical)
         # once a typical belongs to a node, we store node index and slot in it
-        typical.set_node_slot_index(self.index, self.next_slot, len(self.typicals))
+        typical.set_node_slot_index(self.index, self.next_slot, len(self.typicals)-1)
         self.next_slot = self.next_slot + typical.size
 
     def to_dict(self):
@@ -70,6 +72,7 @@ class Souliss:
         self.connected = False
         self.typical_update_callback = None
         self.nodes = []
+        self.num_nodes = 0
 
     def is_connected(self):
         return self.connected
@@ -107,6 +110,9 @@ class Souliss:
         except:
             return False
 
+        # TODO: Testing. Discard random packages
+        # if random.randint(1,10) < 6:
+        #    return False
         macaco_frame = Macaco_frame.from_data(data[7:])
         vnet_frame = VNet_frame(self, macaco_frame)
         self.connected = True
@@ -117,24 +123,24 @@ class Souliss:
     def process(self, macaco_frame):
 
         if macaco_frame.functional_code == SOULISS_FC_DATABASE_STRUCTURE_ANSWER:
-            num_nodes = macaco_frame.payload[0]
-            _LOGGER.info("%d nodes found" % num_nodes)
+            self.num_nodes = macaco_frame.payload[0]
+            _LOGGER.info("%d nodes found" % self.num_nodes)
 
             # Re create the nodes
             self.nodes = []
-            for n in range(num_nodes):
+            for n in range(self.num_nodes):
                 self.nodes.append(Node(n))
 
             # Request logic for all nodes
-            self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, num_nodes)
+            self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, self.num_nodes)
 
         elif macaco_frame.functional_code == SOULISS_FC_READ_TYPICAL_LOGIC_ANSWER:
             node = macaco_frame.start_offset
-            if node > len(self.nodes):
-                _LOGGER.debug('Received state for node %d, but does not exist! Retrying query database' % node)
+            if node > self.num_nodes:
+                _LOGGER.debug('Received logic description for node %d, but does not exist! Retrying query database' % node)
                 self.send(SOULISS_FC_DATABASE_STRUCTURE_REQUEST)
             elif len(self.nodes[node].typicals) > 0:
-                _LOGGER.debug('Duplicate response for node %d. Discarting.' % node)
+                _LOGGER.debug('Duplicate logic description for node %d. Discarting.' % node)
             else:
                 mem = 0
                 while (mem < macaco_frame.number_of):
@@ -158,7 +164,10 @@ class Souliss:
 
         elif macaco_frame.functional_code == SOULISS_FC_READ_STATE_ANSWER:
             node = macaco_frame.start_offset
-            if node > len(self.nodes) or len(self.nodes[node].typicals) == 0:
+            if node >= self.num_nodes:
+                _LOGGER.debug('Received state for node %d, but does not exist! Retrying query database' % node)
+                self.send(SOULISS_FC_DATABASE_STRUCTURE_REQUEST)
+            elif len(self.nodes[node].typicals) == 0:
             # Node still empty. May be READ_TYPICAL_LOGIC_ANSWER was lost
                 _LOGGER.debug('Received state for node %d, but does not exist. Retrying' % node)
                 self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, len(self.nodes))

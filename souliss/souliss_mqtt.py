@@ -19,8 +19,8 @@ class souliss_mqtt:
 
         # Try to connect to Souliss
         self.souliss = souliss.Souliss(souliss_gateway)
-        if self.souliss.database_structure_request():
-            self.souliss.get_response()
+        self.souliss.database_structure_request()
+        self.souliss.get_response()
         if not self.souliss.is_connected():
             _LOGGER.error("Could not connect to souliss gateway at " + souliss_gateway)
             return None
@@ -71,7 +71,7 @@ class souliss_mqtt:
         self.mqttc.publish('pysouliss/%d/%d' % (typical.node, typical.index), typical.state_description)
 
     def loop_forever(self):
-        self.souliss.subscribe_all_typicals()
+        #self.souliss.subscribe_all_typicals()
         for n in self.souliss.nodes:
             for t in n.typicals:
                 t.add_listener(self.publish_change)
