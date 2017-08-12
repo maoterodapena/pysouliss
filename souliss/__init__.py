@@ -43,7 +43,7 @@ class Node:
     # constructor
     def __init__(self, i):
         self.index = i          # index of the typical
-        self.typicals = []      # list of typicals 
+        self.typicals = []      # list of typicals
         self.next_slot = 0      # used internally. When a typical is added to a node,
                                 #   next_slot is incremented
 
@@ -73,9 +73,13 @@ class Souliss:
         self.typical_update_callback = None
         self.nodes = []
         self.num_nodes = 0
+        self.nodes_discovered = 0
 
     def is_connected(self):
         return self.connected
+
+    def all_discovered(self):
+        return self.num_nodes > 0 and self.num_nodes == self.nodes_discovered
 
     def set_typical_update_callback(self, callback):
         # This callback is called whenever a typical is updated.
@@ -92,7 +96,7 @@ class Souliss:
         except:
             _LOGGER.error("Could not connect to souliss gateway. %s" %
                           (sys.exc_info()[1]))
-            return False 
+            return False
         return True
 
     def subscribe_all_typicals(self):
@@ -160,6 +164,7 @@ class Souliss:
                     else:
                         _LOGGER.warning('Typical ' + hex(tipo) + ' not implemented')
 
+                self.nodes_discovered = self.nodes_discovered + 1
                 self.send(SOULISS_FC_READ_STATE_REQUEST_WITH_SUBSCRIPTION, node)
 
         elif macaco_frame.functional_code == SOULISS_FC_READ_STATE_ANSWER:

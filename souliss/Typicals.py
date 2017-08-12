@@ -6,48 +6,51 @@ _LOGGER = logging.getLogger(__name__)
 typical_types = {
         0x11: {
             "desc": "T11: ON/OFF Digital Output with Timer Option", "size": 1,
+            "name": "Switch Timer",
             "state_desc": { 0x00: "off",
                             0x01: "on"}
             },
-        0x12: {"desc": "T12: ON/OFF Digital Output with AUTO mode", 
+        0x12: {"desc": "T12: ON/OFF Digital Output with AUTO mode",
             "size": 1,
+            "name": "Switch auto",
             "state_desc": { 0x00: "off",
                             0x01: "on",
-                            0xF0: "on/auto", 
+                            0xF0: "on/auto",
                             0xF1: "off/auto"
                             }
             },
-        0x13: {"desc": "T13: Digital Input Value", 
+        0x13: {"desc": "T13: Digital Input Value",
             "size": 1,
             "state_desc": { 0x00: "off",
                              0x01: "on"}
             },
-        0x14: {"desc": "T14: Pulse Digital Output", 
+        0x14: {"desc": "T14: Pulse Digital Output",
             "size": 1,
+            "name": "Switch",
             "state_desc": { 0x00: "off",
                              0x01: "on"}
             },
-        0x15: {"desc": "T15: RGB Light", 
+        0x15: {"desc": "T15: RGB Light",
             "size": 2,
             "state_desc": { 0x00: "off",
                              0x01: "on"}
             },
-        0x16: {"desc": "T16: RGB LED Strip", 
+        0x16: {"desc": "T16: RGB LED Strip",
             "size": 4,
             "state_desc": { 0x00: "on",
                              0x01: "on"}
             },
-        0x18: {"desc": "T18: ON/OFF Digital Output (Step Relay)", 
+        0x18: {"desc": "T18: ON/OFF Digital Output (Step Relay)",
             "size": 1,
             "state_desc": { 0x00: "off",
                              0x01: "on"}
             },
-        0x19: {"desc": "T19: Single Color LED Strip", 
+        0x19: {"desc": "T19: Single Color LED Strip",
             "size": 2,
             "state_desc": { 0x00: "off",
                              0x01: "on"}
             },
-        0x1A: {"desc": "T1A: Digital Input Pass Through", 
+        0x1A: {"desc": "T1A: Digital Input Pass Through",
             "size": 1,
             "state_desc": { 0x00: "off",
                              0x01: "on"}
@@ -59,28 +62,28 @@ typical_types = {
         0x32: {"desc": "T32: Air Conditioner", "size": 2},
         0x41: {"desc": "T41: Anti-theft integration -Main-",  "size": 1},
         0x42: {"desc": "T42: Anti-theft integration -Peer-",  "size": 1},
-        0x51: {"desc": "T51: Analog input, half-precision floating point", 
+        0x51: {"desc": "T51: Analog input, half-precision floating point",
             "size": 2,
             "units": "units"},
-        0x52: {"desc": "T52: Temperature measure (-20, +50) C", 
+        0x52: {"desc": "T52: Temperature measure (-20, +50) C",
             "size": 2,
             "units": "C"},
-        0x53: {"desc": "T53: Humidity measure (0, 100) ", 
+        0x53: {"desc": "T53: Humidity measure (0, 100) ",
             "size": 2,
             "units": "%"},
-        0x54: {"desc": "T54: Light Sensor (0, 40) kLux", 
+        0x54: {"desc": "T54: Light Sensor (0, 40) kLux",
             "size": 2,
             "units": "kLux"},
-        0x55: {"desc": "T55: Voltage (0, 400) V", 
+        0x55: {"desc": "T55: Voltage (0, 400) V",
             "size": 2,
             "units": "V"},
-        0x56: {"desc": "T56: Current (0, 25) A", 
+        0x56: {"desc": "T56: Current (0, 25) A",
             "size": 2,
             "units": "A"},
-        0x57: {"desc": "T57: Power (0, 6500) W", 
+        0x57: {"desc": "T57: Power (0, 6500) W",
             "size": 2,
             "units": "W"},
-        0x58: {"desc": "T58: Pressure measure (0, 1500) hPa", 
+        0x58: {"desc": "T58: Pressure measure (0, 1500) hPa",
             "size": 2,
             "units": "hPa"},
         0x61: {"desc": "T61: Analog setpoint, half-precision floating point", "size": 2},
@@ -177,7 +180,7 @@ class TypicalT1n(Typical):
         value = value[:self.size]
         if value != self.state:
             self.state = value
-            if self.size > 1: # Raw description for Typicals T15, T16 and T19 
+            if self.size > 1: # Raw description for Typicals T15, T16 and T19
                 self.state_description = ':'.join("{:02x}".format(c) for c in self.state)
             else:
                 self.state_description = self.state_desc[ord(value)]
