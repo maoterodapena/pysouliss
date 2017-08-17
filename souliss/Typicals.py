@@ -183,7 +183,11 @@ class TypicalT1n(Typical):
             if self.size > 1: # Raw description for Typicals T15, T16 and T19
                 self.state_description = ':'.join("{:02x}".format(c) for c in self.state)
             else:
-                self.state_description = self.state_desc[ord(value)]
+                if ord(value) in self.state_desc.keys():
+                    self.state_description = self.state_desc[ord(value)]
+                else:
+                    _LOGGER.warning("Unknow value!")
+                    self.state_description = "Unknow value!"
 
             _LOGGER.info("Node %d: Typical %d - %s updated to %s" % (self.node, self.index,
                 self.description,

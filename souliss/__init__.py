@@ -75,6 +75,12 @@ class Souliss:
         self.num_nodes = 0
         self.nodes_discovered = 0
 
+    def get_node(self, node):
+        for n in self.nodes:
+            if n.index == node:
+                return n
+        return None
+
     def is_connected(self):
         return self.connected
 
@@ -85,8 +91,8 @@ class Souliss:
         # This callback is called whenever a typical is updated.
         self.typical_update_callback= callback;
 
-    def send(self, functional_code, number_of=0, macaco_payload=None):
-        macaco_frame = Macaco_frame(functional_code, 0, 0, number_of, macaco_payload)
+    def send(self, functional_code, start_offset=0, number_of=0, macaco_payload=None):
+        macaco_frame = Macaco_frame(functional_code, 0, start_offset, number_of, macaco_payload)
         vnet_frame = VNet_frame(self, macaco_frame)
 
         _LOGGER.debug('sending  -> %s ' % (vnet_frame.to_str()))
@@ -102,7 +108,7 @@ class Souliss:
     def subscribe_all_typicals(self):
         for node in range(len(self.nodes)):
             self.send(SOULISS_FC_READ_STATE_REQUEST_WITH_SUBSCRIPTION,
-               len(self.nodes[node].typicals))
+               len(self.get_node(node).typicals))
             time.sleep(0.3)
 
     def get_response(self, expected_response=None):
@@ -130,22 +136,19 @@ class Souliss:
             self.num_nodes = macaco_frame.payload[0]
             _LOGGER.info("%d nodes found" % self.num_nodes)
 
-            # Re create the nodes
-            self.nodes = []
-            for n in range(self.num_nodes):
-                self.nodes.append(Node(n))
+            #self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, 0, self.num_nodes)
+            for i in range(self.num_nodes):
+                self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, i, 1)
+                time.sleep(0.3)
 
-            # Request logic for all nodes
-            self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, self.num_nodes)
 
         elif macaco_frame.functional_code == SOULISS_FC_READ_TYPICAL_LOGIC_ANSWER:
-            node = macaco_frame.start_offset
-            if node > self.num_nodes:
-                _LOGGER.debug('Received logic description for node %d, but does not exist! Retrying query database' % node)
-                self.send(SOULISS_FC_DATABASE_STRUCTURE_REQUEST)
-            elif len(self.nodes[node].typicals) > 0:
-                _LOGGER.debug('Duplicate logic description for node %d. Discarting.' % node)
-            else:
+            node_num = macaco_frame.start_offset
+            node = self.get_node(node_num)
+
+            if node is None:
+                node = Node(node_num)
+                self.nodes.append(node)
                 mem = 0
                 while (mem < macaco_frame.number_of):
                     tipo = macaco_frame.payload[mem]
@@ -158,30 +161,30 @@ class Souliss:
                         new_typical = Typical.factory_type(tipo)
                         if self.typical_update_callback is not None:
                             new_typical.add_listener(self.typical_update_callback)
-                        self.nodes[node].add_typical(new_typical)
-                        _LOGGER.info('Node %d. Added typical %s: %s' % (node, hex(tipo),Typicals.typical_types[tipo]['desc']))
+                        node.add_typical(new_typical)
+                        _LOGGER.info('Node %d. Added typical %s: %s' % (node_num, hex(tipo),Typicals.typical_types[tipo]['desc']))
                         mem = mem + Typicals.typical_types[tipo]['size']
                     else:
                         _LOGGER.warning('Typical ' + hex(tipo) + ' not implemented')
 
                 self.nodes_discovered = self.nodes_discovered + 1
-                self.send(SOULISS_FC_READ_STATE_REQUEST_WITH_SUBSCRIPTION, node)
+                self.send(SOULISS_FC_READ_STATE_REQUEST_WITH_SUBSCRIPTION, 0, node_num)
+            else:
+                _LOGGER.debug('Duplicate logic description for node %d. Discarting.' % node_num)
 
         elif macaco_frame.functional_code == SOULISS_FC_READ_STATE_ANSWER:
-            node = macaco_frame.start_offset
-            if node >= self.num_nodes:
-                _LOGGER.debug('Received state for node %d, but does not exist! Retrying query database' % node)
-                self.send(SOULISS_FC_DATABASE_STRUCTURE_REQUEST)
-            elif len(self.nodes[node].typicals) == 0:
-            # Node still empty. May be READ_TYPICAL_LOGIC_ANSWER was lost
-                _LOGGER.debug('Received state for node %d, but does not exist. Retrying' % node)
-                self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, len(self.nodes))
+            node_num = macaco_frame.start_offset
+            node = self.get_node(node_num)
+            if node is None:
+                _LOGGER.debug('Received state for node %d, but does not exists! Retrying query logic' % node_num)
+                self.send(SOULISS_FC_READ_TYPICAL_LOGIC_REQUEST, node_num, 1)
+                #self.send(SOULISS_FC_DATABASE_STRUCTURE_REQUEST)
             else:
                 typical_index = 0
                 mem = 0
-                while typical_index < len(self.nodes[node].typicals):
-                    self.nodes[node].typicals[typical_index].update(macaco_frame.payload[mem:])
-                    mem = mem + self.nodes[node].typicals[typical_index].size
+                while typical_index < len(node.typicals):
+                    node.typicals[typical_index].update(macaco_frame.payload[mem:])
+                    mem = mem + node.typicals[typical_index].size
                     typical_index = typical_index + 1
 
         else:
@@ -202,8 +205,13 @@ class Souliss:
         if type(typical_num) is str:
             typical_num = int(typical_num)
 
-        _LOGGER.debug('Sending %02x to node %d - typical %d', command, node_num, typical_num)
-        self.send(SOULISS_FC_FORCE_REQUEST, 1, command)
+        _LOGGER.debug('Sending %s to node %d - typical %d', command.hex(), node_num, typical_num)
+        start_off = node_num
+        typical = self.get_node(node_num).typicals[typical_num]
+        number_of = typical.slot + typical.size
+        payload = bytearray(typical.slot) + command
+
+        self.send(SOULISS_FC_FORCE_REQUEST, start_off, number_of, payload)
 
     def dump_structure(self):
         for n in self.nodes:

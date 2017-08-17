@@ -5,6 +5,7 @@ Example for using pysouliss.
 import souliss.pysouliss as souliss
 from optparse import OptionParser
 import logging
+import os
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -105,6 +106,8 @@ def set_main_options():
                       help="Souliss gateway host or IP")
     parser.add_option("-v", "--verbose",
                       action="store_true", dest="verbose")
+    parser.add_option("-n", "--stop_after", dest="stop_after", type="int",
+                      help="Stop after retrieving <n> nodes")
 
     (options, args) = parser.parse_args()
     if options.gateway is None:
@@ -114,6 +117,9 @@ def set_main_options():
         logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.DEBUG)
     else:
         logging.basicConfig(format="%(levelname)s: %(message)s", level=logging.INFO)
+
+    if options.output_file is not None:
+        options.output_file = os.path.normpath(options.output_file)
 
     return options
 
@@ -129,8 +135,13 @@ if __name__ == "__main__":
     SOULISS = souliss.Souliss(options.gateway)
     SOULISS.database_structure_request()
 
-    # Wait until all nodes are discovered
-    while not SOULISS.all_discovered():
+    # Wait until nodes are discovered
+    if options.stop_after is None:
+        stop_after = 9999
+    else:
+        stop_after = options.stop_after
+
+    while not SOULISS.all_discovered() and SOULISS.nodes_discovered < stop_after:
         SOULISS.get_response()
 
     output_text = ""

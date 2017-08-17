@@ -48,4 +48,4 @@ if __name__ == "__main__":
     time.sleep(1)
     if sm.is_connected:
         sm.loop_forever()
-    print("Terminated") 
+    print("Terminated")

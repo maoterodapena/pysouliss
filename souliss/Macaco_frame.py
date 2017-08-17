@@ -1,4 +1,5 @@
 from struct import pack
+import random
 
 # List of tested functional codes
 MACACO_DESC = {
@@ -21,7 +22,11 @@ class Macaco_frame:
 
     def __init__(self, functional_code=0, put_in=0, start_offset=0, number_of=0, payload=None):
         self.functional_code = functional_code  # 1 byte
-        self.put_in = put_in                    # 1 byte
+        # TODO:
+        if put_in == 0:
+            self.put_in = 255*256 + random.randint(0,255)
+        else:
+            self.put_in = put_in
         self.number_of = number_of              # 1 byte
         self.start_offset = start_offset        # 1 byte
         self.payload = payload                  # variable
